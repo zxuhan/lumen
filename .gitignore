@@ -1,0 +1,33 @@
+# Secrets and local config
+.env
+.env.local
+*.pem
+*.key
+
+# Design and working docs, not committed
+docs/
+
+# User evaluation assets
+evals/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Runtime data
+.data/
+*.log
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/

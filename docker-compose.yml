@@ -1,0 +1,120 @@
+name: lumen
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    # Bound to loopback only: the dev passwords below must never be reachable from the network
+    ports:
+      - "127.0.0.1:7311:5432"
+    environment:
+      POSTGRES_USER: retouch
+      POSTGRES_PASSWORD: retouch_dev
+      POSTGRES_DB: retouch
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retouch -d retouch"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7312:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Local object storage for development and tests; deployments use Cloudflare R2 (S3_* in .env).
+  # MinIO no longer publishes minio/minio on Docker Hub, so this uses Chainguard's build.
+  minio:
+    image: chainguard/minio:latest
+    # The image runs as nonroot, which can't write to a freshly created named volume
+    user: "0:0"
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "127.0.0.1:7313:9000"
+      - "127.0.0.1:7314:9001"
+    environment:
+      MINIO_ROOT_USER: retouch
+      MINIO_ROOT_PASSWORD: retouch_dev
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # The services below are only enabled for deployment:
+  #   docker compose --profile deploy up -d --build app worker caddy
+  # Storage comes from the S3_* settings in .env (Cloudflare R2), so MinIO isn't started.
+  app:
+    profiles: ["deploy"]
+    build: .
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 7302
+    # Only reachable from the server itself; Caddy is the public entry point
+    ports:
+      - "127.0.0.1:7302:7302"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://retouch:retouch_dev@postgres:5432/retouch
+      REDIS_URL: redis://redis:6379
+      # rembg downloads its models here, into the volume that survives redeploys
+      U2NET_HOME: /root/.u2net
+    volumes:
+      - cv_models:/root/.u2net
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    profiles: ["deploy"]
+    build: .
+    restart: unless-stopped
+    command: arq app.worker.WorkerSettings
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://retouch:retouch_dev@postgres:5432/retouch
+      REDIS_URL: redis://redis:6379
+      # rembg downloads its models here, into the volume that survives redeploys
+      U2NET_HOME: /root/.u2net
+    volumes:
+      - cv_models:/root/.u2net
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  # HTTPS for DOMAIN (set in .env): Caddy gets and renews the Let's Encrypt certificate
+  caddy:
+    profiles: ["deploy"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  pg_data:
+  redis_data:
+  minio_data:
+  cv_models:
+  caddy_data:
+  caddy_config:
