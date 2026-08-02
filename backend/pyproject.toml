@@ -1,0 +1,57 @@
+[project]
+name = "lumen-backend"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic-settings",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "alembic",
+    "arq",
+    "redis",
+    "boto3",
+    "pillow",
+    "python-multipart",
+    "bcrypt",
+    "pyjwt",
+    "httpx",
+    "openai>=3.31.0",
+]
+
+[project.optional-dependencies]
+cv = [
+    "rembg",
+    "onnxruntime",
+    "opencv-python-headless",
+    "rapidocr-onnxruntime",
+]
+agent = [
+    "langgraph",
+    "langgraph-checkpoint-postgres",
+    "langchain-core",
+    "langchain-openai>=1.7.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 100
+exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+# The DB engine is created at module level, so all tests must share one event loop; otherwise
+# reusing connections across loops fails
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
