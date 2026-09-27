@@ -1,0 +1,77 @@
+vars: {
+  d2-config: {
+    layout-engine: dagre
+    pad: 16
+  }
+}
+
+direction: down
+
+classes: {
+  client: {
+    shape: rectangle
+    style: {
+      fill: "#FAFAF9"
+      stroke: "#525252"
+      stroke-width: 2
+      font-color: "#111827"
+      border-radius: 6
+    }
+  }
+  service: {
+    shape: rectangle
+    style: {
+      fill: "#FFF7ED"
+      stroke: "#C2410C"
+      stroke-width: 2
+      font-color: "#1F2937"
+      border-radius: 8
+    }
+  }
+  store: {
+    shape: cylinder
+    style: {
+      fill: "#FAFAF9"
+      stroke: "#525252"
+      stroke-width: 2
+      font-color: "#111827"
+    }
+  }
+  model: {
+    shape: rectangle
+    style: {
+      fill: "#FEF9C3"
+      stroke: "#A16207"
+      stroke-width: 2
+      font-color: "#111827"
+      border-radius: 6
+    }
+  }
+}
+
+ui: "React 19 + Konva\neditor" {class: client}
+api: "FastAPI\nauth · sessions · planner" {class: service}
+worker: "ARQ worker\n22 tools" {class: service}
+redis: "Redis\nARQ queue · pub/sub" {class: store}
+planner: "OpenAI\ngpt-5-mini" {class: model}
+images: "OpenAI\ngpt-image-2" {class: model}
+
+storage: "" {
+  style: {
+    fill: transparent
+    stroke: "#A3A3A3"
+    stroke-dash: 4
+    border-radius: 8
+  }
+  pg: "PostgreSQL\nsessions · layer documents · runs" {class: store}
+  s3: "Cloudflare R2 / MinIO\nimage assets" {class: store}
+}
+
+ui -> api: "REST + SSE"
+api -> planner: "tool calls"
+api <-> redis: "enqueue runs · progress events"
+redis <-> worker: "tool runs · progress"
+worker -> images: "generate · edit"
+ui -> storage.s3: "signed URLs"
+api -> storage
+worker -> storage

@@ -1,0 +1,6 @@
+# Public entry point: HTTPS for $DOMAIN, proxied to the app. Server-sent events stream through
+# as they arrive.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:7302
+}

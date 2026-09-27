@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to a pull request cancels its older run; runs on main always finish
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: retouch
+          POSTGRES_PASSWORD: retouch_dev
+          POSTGRES_DB: retouch
+        ports: ["7311:5432"]
+        options: >-
+          --health-cmd "pg_isready -U retouch -d retouch"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["7312:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      # Service containers can't take a command, and MinIO needs `server /data`
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio --user 0:0 -p 7313:9000 \
+            -e MINIO_ROOT_USER=retouch -e MINIO_ROOT_PASSWORD=retouch_dev \
+            chainguard/minio:latest server /data
+          for i in $(seq 1 30); do curl -sf http://localhost:7313/minio/health/live && break; sleep 1; done
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-extras --locked
+      - run: uv run ruff check app tests scripts
+      - run: uv run alembic upgrade head
+      # The settings defaults point at the services above; tests use the mock image provider
+      - run: uv run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  deploy:
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: Deploy over SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key "$TARGET" 'bash -s' <<'EOF'
+          set -euo pipefail
+          cd ~/lumen
+          git pull --ff-only
+          docker compose --profile deploy build app worker
+          # Migrate before the new code starts serving
+          docker compose --profile deploy run --rm app alembic upgrade head
+          docker compose --profile deploy up -d app worker caddy
+          docker image prune -f
+          EOF

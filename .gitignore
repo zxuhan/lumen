@@ -4,8 +4,10 @@
 *.pem
 *.key
 
-# Design and working docs, not committed
-docs/
+# Design and working docs, not committed; the D2 diagrams and their SVGs are
+docs/*
+!docs/*.d2
+!docs/*.svg
 
 # User evaluation assets
 evals/
