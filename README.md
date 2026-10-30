@@ -17,7 +17,7 @@
 
 **<https://lumen.zxuhan.me/>**
 
-Log in with the demo account **`demo`** / **`lumen-demo`**, or sign up with your own username.
+Log in with the demo account **`testaccount`** / **`test123456`**, or sign up with your own username.
 
 ---
 
@@ -33,14 +33,26 @@ The API plans each instruction and queues its steps. A separate ARQ worker runs 
 
 ## The agent
 
-The agent uses the same 22 tools as the toolbar: generation and AI edits with gpt-image-2, background removal, click-to-select and text layers with local ONNX models, plus layer and pixel operations.
+The agent plans with the same 22 tools as the toolbar. Each tool is one `ToolSpec`: a Pydantic parameter model, a description written for the model, and an executor.
+
+**What it can do**
+
+- **Generate** (gpt-image-2): product images from a prompt, plus marketing shots (product, scene, model, poster).
+- **AI edits** (gpt-image-2): replace the background, expand the canvas, upscale, and erase or replace a selected region.
+- **Local vision** (ONNX models on the worker): remove the background (rembg), split an image into editable layers (rembg + RapidOCR), and extract the selected object to its own layer.
+- **Pixels** (Pillow): adjust colors with 11 parameters, crop, and export 1:1 / 4:5 / 9:16 ad sizes without cropping the subject.
+- **Layers:** move, scale, rotate, flip, reorder, set opacity and visibility, and edit text layers.
+- **Batch:** apply one edit to many images at once.
+
+**How a request becomes a plan**
 
 | Stage | What it does |
 |---|---|
-| **Context** (`services/agent.py`) | Gives the planner only what it needs: canvas size, layers, and the current selection. |
-| **Planner** (`agent/llm.py`, `agent/graph.py`) | gpt-5-mini with all 22 tool schemas bound, generated from the same Pydantic models the toolbar uses. Runs as a LangGraph `plan → verify` graph. |
-| **Verifier** (`agent/plan.py`) | Rejects unknown tools and invalid parameters, orders steps by their dependencies, rejects cycles, and caps plans at 8 steps. |
-| **Executor** (`tasks/tools.py`) | Queues each ready step as a tool run on the worker and advances the plan as runs finish. |
+| **Context** (`services/agent.describe`) | Summarizes the canvas for the model: size, layers from bottom to top, and the current selection. |
+| **Planner** (`agent/llm.py`, `agent/graph.py`) | gpt-5-mini with all 22 tool schemas bound, generated from the tools' Pydantic models. The system prompt holds the editing rules, such as one step per layer, `replace_region` to recolor, and `adjust_image` only for brightness and color temperature. Runs as a LangGraph `plan → verify` graph. |
+| **Verifier** (`agent/plan.py`) | Never runs the model's output as-is: rejects unknown tools, validates every parameter with the toolbar's Pydantic model, orders steps by their dependencies, and rejects cycles and plans over 8 steps. |
+| **Confirmation** | Single steps run right away; multi-step plans wait for the user. An active selection is pinned to the region tools, so the plan edits what the user selected. |
+| **Executor** (`tasks/tools.py`) | Queues each step whose dependencies have succeeded as a tool run on the worker, and advances the plan as runs finish. |
 
 ---
 
@@ -50,7 +62,7 @@ The agent uses the same 22 tools as the toolbar: generation and AI edits with gp
   <img src="docs/agent-lifecycle.svg" alt="Agent lifecycle: planning, confirmation for multi-step plans, running, then succeeded, failed (retryable), or canceled" width="340">
 </p>
 
-Single steps run right away; multi-step plans wait for the user to confirm. A failed step can be retried, and cancelling stops every step that hasn't started.
+A failed step can be retried, and cancelling stops every step that hasn't started.
 
 ---
 
