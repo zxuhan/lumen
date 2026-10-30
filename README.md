@@ -17,7 +17,7 @@
 
 **<https://lumen.zxuhan.me/>**
 
-Log in with the demo account **`testaccount`** / **`test123456`**, or sign up with your own username.
+Sign up with any username, upload a photo, and describe the edit in the chat.
 
 ---
 
