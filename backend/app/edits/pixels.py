@@ -1,9 +1,12 @@
 import io
 import math
+from threading import Lock
 
 from PIL import Image, ImageChops, ImageEnhance, ImageFilter
 
 _CORNER_TOLERANCE = 28
+_matting_lock = Lock()
+_matting = None
 
 
 def remove_background(data: bytes) -> bytes:
@@ -18,8 +21,21 @@ def remove_background(data: bytes) -> bytes:
             if provider == "rembg":
                 raise
         else:
-            return bytes(remove(data))
+            return bytes(remove(data, session=_matting_session()))
     return _corner_matte(data)
+
+
+def _matting_session():
+    """Load the matting model once per process; rembg would otherwise reload it on every call."""
+    global _matting
+    with _matting_lock:
+        if _matting is None:
+            from rembg.session_factory import new_session
+
+            from app.config import get_settings
+
+            _matting = new_session(get_settings().matting_model)
+        return _matting
 
 
 def adjust(

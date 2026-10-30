@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # auto: rembg if installed, otherwise corner-color matting; tests force corner to avoid
     # downloading models
     matting_provider: str = "auto"
+    # rembg model for background removal. isnet-general-use fits a 4 GB server; bria-rmbg has
+    # finer edges but needs several GB of RAM
+    matting_model: str = "isnet-general-use"
     # auto: detect text layers if rapidocr is installed; none skips it; tests force none
     ocr_provider: str = "auto"
 
