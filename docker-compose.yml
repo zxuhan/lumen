@@ -8,13 +8,13 @@ services:
     ports:
       - "127.0.0.1:7311:5432"
     environment:
-      POSTGRES_USER: retouch
-      POSTGRES_PASSWORD: retouch_dev
-      POSTGRES_DB: retouch
+      POSTGRES_USER: lumen
+      POSTGRES_PASSWORD: lumen_dev
+      POSTGRES_DB: lumen
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U retouch -d retouch"]
+      test: ["CMD-SHELL", "pg_isready -U lumen -d lumen"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -44,8 +44,8 @@ services:
       - "127.0.0.1:7313:9000"
       - "127.0.0.1:7314:9001"
     environment:
-      MINIO_ROOT_USER: retouch
-      MINIO_ROOT_PASSWORD: retouch_dev
+      MINIO_ROOT_USER: lumen
+      MINIO_ROOT_PASSWORD: lumen_dev
     volumes:
       - minio_data:/data
     healthcheck:
@@ -67,7 +67,7 @@ services:
       - "127.0.0.1:7302:7302"
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://retouch:retouch_dev@postgres:5432/retouch
+      DATABASE_URL: postgresql+asyncpg://lumen:lumen_dev@postgres:5432/lumen
       REDIS_URL: redis://redis:6379
       # rembg downloads its models here, into the volume that survives redeploys
       U2NET_HOME: /root/.u2net
@@ -84,7 +84,7 @@ services:
     command: arq app.worker.WorkerSettings
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://retouch:retouch_dev@postgres:5432/retouch
+      DATABASE_URL: postgresql+asyncpg://lumen:lumen_dev@postgres:5432/lumen
       REDIS_URL: redis://redis:6379
       # rembg downloads its models here, into the volume that survives redeploys
       U2NET_HOME: /root/.u2net

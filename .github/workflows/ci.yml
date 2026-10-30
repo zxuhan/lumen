@@ -17,12 +17,12 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_USER: retouch
-          POSTGRES_PASSWORD: retouch_dev
-          POSTGRES_DB: retouch
+          POSTGRES_USER: lumen
+          POSTGRES_PASSWORD: lumen_dev
+          POSTGRES_DB: lumen
         ports: ["7311:5432"]
         options: >-
-          --health-cmd "pg_isready -U retouch -d retouch"
+          --health-cmd "pg_isready -U lumen -d lumen"
           --health-interval 5s --health-timeout 3s --health-retries 10
       redis:
         image: redis:7-alpine
@@ -39,7 +39,7 @@ jobs:
       - name: Start MinIO
         run: |
           docker run -d --name minio --user 0:0 -p 7313:9000 \
-            -e MINIO_ROOT_USER=retouch -e MINIO_ROOT_PASSWORD=retouch_dev \
+            -e MINIO_ROOT_USER=lumen -e MINIO_ROOT_PASSWORD=lumen_dev \
             chainguard/minio:latest server /data
           for i in $(seq 1 30); do curl -sf http://localhost:7313/minio/health/live && break; sleep 1; done
       - uses: astral-sh/setup-uv@v6

@@ -118,7 +118,7 @@ cd frontend && npm install && npm run dev          # terminal 3, from the repo r
 | Frontend      | <http://localhost:7301>                   |
 | API health    | <http://localhost:7302/api/health>        |
 | API docs      | <http://localhost:7302/api/docs>          |
-| MinIO console | <http://localhost:7314> (`retouch` / `retouch_dev`) |
+| MinIO console | <http://localhost:7314> (`lumen` / `lumen_dev`) |
 
 > **Costs and first run.** Chat planning needs `OPENAI_API_KEY` even in mock mode. With `IMAGE_PROVIDER=openai`, a medium-quality image costs a few cents. The first background removal or click-to-select downloads the local models (about 1 GB). To check the key and models without the rest of the stack: `uv run python -m scripts.smoke_openai`.
 

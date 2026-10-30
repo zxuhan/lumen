@@ -1,4 +1,4 @@
-const KEY = 'retouch:prompt-draft'
+const KEY = 'lumen:prompt-draft'
 
 /**
  * Prompt draft saved by the landing page and restored later; it only lives in the current tab.

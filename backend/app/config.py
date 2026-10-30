@@ -14,15 +14,15 @@ class Settings(BaseSettings):
     app_env: str = "development"
     api_port: int = 7302
 
-    database_url: str = "postgresql+asyncpg://retouch:retouch_dev@localhost:7311/retouch"
+    database_url: str = "postgresql+asyncpg://lumen:lumen_dev@localhost:7311/lumen"
     redis_url: str = "redis://localhost:7312"
 
     s3_endpoint: str = "http://localhost:7313"
     # Address browsers use to open signed URLs; empty means the same as s3_endpoint
     s3_public_endpoint: str = ""
-    s3_access_key: str = "retouch"
-    s3_secret_key: str = "retouch_dev"
-    s3_bucket: str = "retouch"
+    s3_access_key: str = "lumen"
+    s3_secret_key: str = "lumen_dev"
+    s3_bucket: str = "lumen"
     # Cloudflare R2 expects "auto" (us-east-1 is accepted as an alias); MinIO uses the default
     s3_region: str = "us-east-1"
     # Signed URL lifetime, in seconds
