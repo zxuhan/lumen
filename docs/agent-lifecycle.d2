@@ -1,0 +1,80 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+    pad: 16
+  }
+}
+
+direction: down
+
+classes: {
+  input: {
+    shape: rectangle
+    style: {
+      fill: "#FAFAF9"
+      stroke: "#525252"
+      stroke-width: 2
+      font-color: "#111827"
+      border-radius: 6
+    }
+  }
+  step: {
+    shape: rectangle
+    style: {
+      fill: "#FFF7ED"
+      stroke: "#C2410C"
+      stroke-width: 2
+      font-color: "#1F2937"
+      border-radius: 6
+    }
+  }
+  done: {
+    shape: rectangle
+    style: {
+      fill: "#ECFDF5"
+      stroke: "#047857"
+      stroke-width: 2
+      font-color: "#064E3B"
+      border-radius: 6
+    }
+  }
+  error: {
+    shape: rectangle
+    style: {
+      fill: "#FEF2F2"
+      stroke: "#B91C1C"
+      stroke-width: 2
+      font-color: "#7F1D1D"
+      border-radius: 6
+    }
+  }
+  stopped: {
+    shape: rectangle
+    style: {
+      fill: "#F5F5F4"
+      stroke: "#78716C"
+      stroke-width: 2
+      font-color: "#292524"
+      border-radius: 6
+    }
+  }
+}
+
+instruction: "User instruction" {class: input}
+plan: "Planning\ngpt-5-mini + verifier" {class: step}
+confirm: "Queued\nwaiting for confirmation" {class: step}
+run: "Running\nsteps on the worker" {class: step}
+canceled: "Canceled" {class: stopped}
+succeeded: "Succeeded" {class: done}
+failed: "Failed" {class: error}
+
+instruction -> plan
+plan -> confirm: "multi-step"
+plan -> run: "single step"
+plan -> failed: "planner error"
+confirm -> run: "confirm"
+confirm -> canceled: "cancel"
+run -> succeeded: "done"
+run -> failed: "step failed"
+failed -> run: "retry"
+run -> canceled: "cancel"
