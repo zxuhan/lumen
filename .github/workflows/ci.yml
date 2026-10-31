@@ -88,8 +88,9 @@ jobs:
           cd ~/lumen
           git pull --ff-only
           docker compose --profile deploy build app worker
-          # Migrate before the new code starts serving
-          docker compose --profile deploy run --rm app alembic upgrade head
+          # Migrate before the new code starts serving. This script arrives on stdin, so run gets
+          # /dev/null instead; otherwise it swallows the lines below and they never run
+          docker compose --profile deploy run --rm -T app alembic upgrade head < /dev/null
           docker compose --profile deploy up -d app worker caddy
           docker image prune -f
           EOF
