@@ -118,6 +118,7 @@ ERASE_REGION = ToolSpec(
     queued=True,
     session_required=True,
     agent_hidden=HIDDEN_MASK,
+    paid_images=1,
 )
 
 REPLACE_REGION = ToolSpec(
@@ -134,4 +135,5 @@ REPLACE_REGION = ToolSpec(
     queued=True,
     session_required=True,
     agent_hidden=HIDDEN_MASK,
+    paid_images=1,
 )

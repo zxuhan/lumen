@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException, Response, status
 
+from app import limits
 from app.config import get_settings
 from app.db import SessionDep
 from app.deps import CurrentUser
+from app.limits import ClientIP
 from app.models import User
 from app.schemas.auth import Credentials, UserOut
 from app.security import SESSION_COOKIE, issue_token
@@ -26,7 +28,10 @@ def _start_session(response: Response, user: User) -> UserOut:
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(credentials: Credentials, response: Response, session: SessionDep) -> UserOut:
+async def register(
+    credentials: Credentials, response: Response, session: SessionDep, ip: ClientIP
+) -> UserOut:
+    await limits.signup(ip)
     try:
         user = await auth_service.register(session, credentials.username, credentials.password)
     except auth_service.UsernameTaken:

@@ -4,6 +4,7 @@ import uuid
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import limits
 from app.layers import LayerDocument
 from app.models import Asset, ToolRun
 from app.models.tool_run import RunStatus
@@ -37,12 +38,17 @@ async def submit(
     tool: str,
     params: dict,
     session_id: uuid.UUID | None = None,
+    ip: str | None = None,
 ) -> ToolRun:
+    """ip is set when the run comes straight from a visitor's request, so its AI images count
+    against the demo limits; agent steps are counted when their plan starts."""
     spec = spec_of(tool)
     if spec.session_required and session_id is None:
         raise InvalidParams("This tool must be used within an editing session")
 
-    run = await runs.create(session, user_id, tool, validate(tool, params), session_id)
+    checked = validate(tool, params)
+    await limits.ai_images(ip, spec.paid_images_for(checked))
+    run = await runs.create(session, user_id, tool, checked, session_id)
     if spec.queued:
         await enqueue(TASK, run.id)
     else:

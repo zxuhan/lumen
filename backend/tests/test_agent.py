@@ -416,3 +416,30 @@ async def test_failed_step_can_be_retried(signed_in: httpx.AsyncClient, fake_pla
     ).json()
     assert retried["status"] == "running"
     assert retried["steps"][0]["run_id"] != failed["steps"][0]["run_id"]
+
+
+async def test_single_step_plan_counts_its_ai_images_before_running(
+    signed_in: httpx.AsyncClient, fake_planner, demo_limits, monkeypatch
+):
+    monkeypatch.setattr(demo_limits, "limit_ai_images_per_ip", 1)
+    fake_planner(tool_call("generate_image", PROMPT))
+    session_id = (await open_session(signed_in))["id"]
+
+    response = await signed_in.post(
+        f"/api/sessions/{session_id}/messages", json={"text": "Two mugs, please"}
+    )
+    assert response.status_code == 429
+    assert "This needs 2 AI images" in response.json()["detail"]
+
+
+async def test_confirming_a_plan_counts_all_of_its_ai_images(
+    signed_in: httpx.AsyncClient, fake_planner, demo_limits
+):
+    fake_planner(tool_calls(("generate_image", PROMPT), ("generate_image", {**PROMPT, "count": 3})))
+    session_id = (await open_session(signed_in))["id"]
+    turn = await send(signed_in, session_id, "Two rounds of mugs")
+    assert turn["status"] == "queued"
+
+    response = await signed_in.post(f"/api/sessions/{session_id}/messages/{turn['id']}/confirm")
+    assert response.status_code == 429
+    assert "This needs 5 AI images" in response.json()["detail"]

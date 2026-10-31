@@ -60,7 +60,14 @@ class ToolSpec:
     # Refines the label by params, e.g. flip distinguishes horizontal from vertical;
     # returning None falls back to label
     detail: Callable[[dict], str | None] | None = None
+    # Images a run asks the image provider for, which cost money; the demo's usage limits count
+    # them. Local tools leave it at 0
+    paid_images: int | Callable[[dict], int] = 0
 
     def label_for(self, params: dict | None = None) -> str:
         refined = self.detail(params or {}) if self.detail else None
         return refined or self.label
+
+    def paid_images_for(self, params: dict) -> int:
+        """params must already be validated, so defaults such as count are filled in."""
+        return self.paid_images(params) if callable(self.paid_images) else self.paid_images

@@ -3,8 +3,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 
+from app import limits
 from app.db import SessionDep
 from app.deps import CurrentUser
+from app.limits import ClientIP
 from app.models.asset import AssetKind, AssetSource
 from app.schemas.asset import AssetOut, LibraryGroupOut
 from app.services import assets as asset_service
@@ -19,7 +21,9 @@ async def upload(
     user: CurrentUser,
     session: SessionDep,
     file: Annotated[UploadFile, File()],
+    ip: ClientIP,
 ) -> AssetOut:
+    await limits.request(ip)
     data = await file.read()
     if len(data) > MAX_FILE_BYTES:
         raise HTTPException(

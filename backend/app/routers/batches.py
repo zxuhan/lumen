@@ -4,8 +4,10 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
 
+from app import limits
 from app.db import SessionDep
 from app.deps import CurrentUser
+from app.limits import ClientIP
 from app.schemas.batch import BatchIn, BatchOut
 from app.schemas.run import RunOut
 from app.services import batch, runs, tools
@@ -18,13 +20,17 @@ router = APIRouter(prefix="/batches", tags=["batches"])
 
 
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
-async def create_batch(payload: BatchIn, user: CurrentUser, session: SessionDep) -> RunOut:
+async def create_batch(
+    payload: BatchIn, user: CurrentUser, session: SessionDep, ip: ClientIP
+) -> RunOut:
+    await limits.request(ip)
     try:
         await batch.require_assets(session, user.id, payload.asset_ids)
     except UnknownBatchAsset as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Asset not found") from exc
     try:
-        run = await tools.submit(session, user.id, BATCH_NAME, payload.model_dump(mode="json"))
+        params = payload.model_dump(mode="json")
+        run = await tools.submit(session, user.id, BATCH_NAME, params, ip=ip)
     except InvalidParams as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     return RunOut.of(run)

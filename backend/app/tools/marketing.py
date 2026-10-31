@@ -164,6 +164,7 @@ GENERATE_MARKETING = ToolSpec(
     handler=generate_marketing_exec,
     queued=True,
     session_required=True,
+    paid_images=lambda params: params["count"],
 )
 
 PREPARE_DELIVERY_SIZES = ToolSpec(

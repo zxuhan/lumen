@@ -2,11 +2,13 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import storage
 from app.config import get_settings
+from app.limits import LimitExceeded
 from app.queue import close_queue
 from app.routers import assets, auth, batches, events, health, runs, sessions
 
@@ -26,6 +28,12 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(LimitExceeded)
+async def _limit_exceeded(_: Request, exc: LimitExceeded) -> JSONResponse:
+    return JSONResponse({"detail": str(exc)}, status_code=429)
+
 
 api = APIRouter(prefix="/api")
 api.include_router(health.router)

@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
-from app import agent
+from app import agent, limits
 from app.agent import plan as plan_mod
 from app.layers import Layer, LayerDocument, LayerKind
 from app.models import AgentRun, EditSession, ToolRun
@@ -74,7 +74,9 @@ def _layer_name(layer: Layer) -> str:
     return name if layer.visible else f"{name} (hidden)"
 
 
-async def respond(session: AsyncSession, record: EditSession, goal: str) -> AgentRun:
+async def respond(
+    session: AsyncSession, record: EditSession, goal: str, ip: str | None = None
+) -> AgentRun:
     """Plan one instruction turn and persist it. Multi-step plans pause for confirmation;
     single steps start right away."""
     revision = record.revision
@@ -98,6 +100,8 @@ async def respond(session: AsyncSession, record: EditSession, goal: str) -> Agen
         status = RunStatus.RUNNING
     else:
         status = RunStatus.SUCCEEDED
+    if status is RunStatus.RUNNING:
+        await _charge(steps, ip)
 
     turn = AgentRun(
         user_id=record.user_id,
@@ -141,12 +145,15 @@ def _wants_mask(tool: str) -> bool:
     return "mask_asset_id" in spec_of(tool).params.model_fields
 
 
-async def confirm(session: AsyncSession, record: EditSession, turn_id: uuid.UUID) -> AgentRun:
+async def confirm(
+    session: AsyncSession, record: EditSession, turn_id: uuid.UUID, ip: str | None = None
+) -> AgentRun:
     turn = await _get(session, record, turn_id)
     steps = _copy(turn.plan)
     waiting = [step for step in steps if step["status"] == plan_mod.WAITING]
     if turn.status is not RunStatus.QUEUED and not waiting:
         raise CannotConfirm
+    await _charge(steps, ip)
     for step in waiting:
         step["status"] = plan_mod.PENDING
         step["approved"] = True
@@ -170,7 +177,9 @@ async def cancel(session: AsyncSession, record: EditSession, turn_id: uuid.UUID)
     return turn
 
 
-async def retry(session: AsyncSession, record: EditSession, turn_id: uuid.UUID) -> AgentRun:
+async def retry(
+    session: AsyncSession, record: EditSession, turn_id: uuid.UUID, ip: str | None = None
+) -> AgentRun:
     turn = await _get(session, record, turn_id)
     steps = _copy(turn.plan)
     failed = next((step for step in reversed(steps) if step["status"] == plan_mod.FAILED), None)
@@ -178,6 +187,8 @@ async def retry(session: AsyncSession, record: EditSession, turn_id: uuid.UUID) 
         raise CannotRetry
     failed["run_id"] = None
     failed["status"] = plan_mod.PENDING
+    failed["charged"] = False
+    await _charge(steps, ip)
     turn.plan = steps
     turn.status = RunStatus.RUNNING
     turn.error = None
@@ -245,6 +256,20 @@ async def _advance(session: AsyncSession, turn: AgentRun) -> AgentRun:
     await session.commit()
     await session.refresh(turn)
     return turn
+
+
+async def _charge(steps: list[dict], ip: str | None) -> None:
+    """Count the AI images of every step that is about to run. The worker submits later steps
+    without knowing the visitor's IP, so the whole plan is counted when the user commits to it."""
+    due = [
+        step
+        for step in steps
+        if step["status"] in {plan_mod.PENDING, plan_mod.WAITING} and not step.get("charged")
+    ]
+    images = sum(spec_of(step["tool"]).paid_images_for(step["params"]) for step in due)
+    await limits.ai_images(ip, images)
+    for step in due:
+        step["charged"] = True
 
 
 async def _cancel_queued_runs(session: AsyncSession, steps: list[dict]) -> None:

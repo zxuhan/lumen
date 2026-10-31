@@ -54,9 +54,23 @@ class Settings(BaseSettings):
     # auto: detect text layers if rapidocr is installed; none skips it; tests force none
     ocr_provider: str = "auto"
 
+    # Usage limits for the public demo, counted per client IP in Redis; daily limits reset at
+    # 00:00 UTC. On in production unless LIMITS_ENABLED says otherwise; 0 turns one limit off
+    limits_enabled: bool | None = None
+    limit_ai_images_per_ip: int = 20
+    limit_ai_images_total: int = 150
+    limit_messages_per_ip: int = 60
+    limit_signups_per_ip: int = 3
+    # Requests that start work (uploads, tool runs, batches, chat), per IP per minute
+    limit_requests_per_minute: int = 30
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def limits_active(self) -> bool:
+        return self.is_production if self.limits_enabled is None else self.limits_enabled
 
     @property
     def frontend_dist(self) -> Path:

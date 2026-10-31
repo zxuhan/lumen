@@ -5,8 +5,10 @@ from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import limits
 from app.db import SessionDep
 from app.deps import CurrentUser
+from app.limits import ClientIP
 from app.models import Asset, EditSession, User
 from app.schemas.agent import MessageIn, TurnOut
 from app.schemas.asset import AssetOut
@@ -120,8 +122,9 @@ async def _selection_out(session: AsyncSession, user: User, payload: dict) -> Se
 
 @router.post("/{session_id}/selection/prepare", status_code=status.HTTP_204_NO_CONTENT)
 async def prepare_selection(
-    session_id: uuid.UUID, user: CurrentUser, session: SessionDep
+    session_id: uuid.UUID, user: CurrentUser, session: SessionDep, ip: ClientIP
 ) -> None:
+    await limits.request(ip)
     record = await _load(session, user, session_id)
     await selections.prepare(session, record)
 
@@ -182,11 +185,16 @@ async def delete_selection(
 
 @router.post("/{session_id}/tools", status_code=status.HTTP_202_ACCEPTED)
 async def invoke_tool(
-    session_id: uuid.UUID, payload: ToolInvokeIn, user: CurrentUser, session: SessionDep
+    session_id: uuid.UUID,
+    payload: ToolInvokeIn,
+    user: CurrentUser,
+    session: SessionDep,
+    ip: ClientIP,
 ) -> ToolInvokeOut:
+    await limits.request(ip)
     record = await _load(session, user, session_id)
     try:
-        run = await tools.submit(session, user.id, payload.tool, payload.params, record.id)
+        run = await tools.submit(session, user.id, payload.tool, payload.params, record.id, ip=ip)
     except UnknownTool as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except InvalidParams as exc:
@@ -256,19 +264,30 @@ async def list_messages(
 
 @router.post("/{session_id}/messages", status_code=status.HTTP_201_CREATED)
 async def send_message(
-    session_id: uuid.UUID, payload: MessageIn, user: CurrentUser, session: SessionDep
+    session_id: uuid.UUID,
+    payload: MessageIn,
+    user: CurrentUser,
+    session: SessionDep,
+    ip: ClientIP,
 ) -> TurnOut:
+    await limits.request(ip)
     record = await _load(session, user, session_id)
-    return TurnOut.of(await agent_service.respond(session, record, payload.text))
+    await limits.message(ip)
+    return TurnOut.of(await agent_service.respond(session, record, payload.text, ip))
 
 
 @router.post("/{session_id}/messages/{turn_id}/confirm")
 async def confirm_plan(
-    session_id: uuid.UUID, turn_id: uuid.UUID, user: CurrentUser, session: SessionDep
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    user: CurrentUser,
+    session: SessionDep,
+    ip: ClientIP,
 ) -> TurnOut:
+    await limits.request(ip)
     record = await _load(session, user, session_id)
     try:
-        return TurnOut.of(await agent_service.confirm(session, record, turn_id))
+        return TurnOut.of(await agent_service.confirm(session, record, turn_id, ip))
     except TurnNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found") from exc
     except CannotConfirm as exc:
@@ -292,11 +311,16 @@ async def cancel_plan(
 
 @router.post("/{session_id}/messages/{turn_id}/retry")
 async def retry_plan(
-    session_id: uuid.UUID, turn_id: uuid.UUID, user: CurrentUser, session: SessionDep
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    user: CurrentUser,
+    session: SessionDep,
+    ip: ClientIP,
 ) -> TurnOut:
+    await limits.request(ip)
     record = await _load(session, user, session_id)
     try:
-        return TurnOut.of(await agent_service.retry(session, record, turn_id))
+        return TurnOut.of(await agent_service.retry(session, record, turn_id, ip))
     except TurnNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found") from exc
     except CannotRetry as exc:

@@ -3,8 +3,10 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import limits
 from app.db import SessionDep
 from app.deps import CurrentUser
+from app.limits import ClientIP
 from app.models.tool_run import ToolRun
 from app.schemas.asset import AssetOut
 from app.schemas.run import GenerateIn, RunOut
@@ -27,12 +29,16 @@ async def _candidates(session: AsyncSession, run: ToolRun) -> list[AssetOut]:
 
 
 @router.post("/generations", status_code=status.HTTP_202_ACCEPTED)
-async def create_generation(payload: GenerateIn, user: CurrentUser, session: SessionDep) -> RunOut:
+async def create_generation(
+    payload: GenerateIn, user: CurrentUser, session: SessionDep, ip: ClientIP
+) -> RunOut:
+    await limits.request(ip)
     for asset_id in payload.reference_asset_ids:
         if await asset_service.get_for_user(session, user.id, asset_id) is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Reference image not found")
 
-    run = await tools.submit(session, user.id, GENERATE_IMAGE.name, payload.model_dump(mode="json"))
+    params = payload.model_dump(mode="json")
+    run = await tools.submit(session, user.id, GENERATE_IMAGE.name, params, ip=ip)
     return RunOut.of(run)
 
 

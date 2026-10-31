@@ -100,3 +100,23 @@ async def cleanup_users():
     async with SessionFactory() as session:
         await session.execute(delete(User).where(User.username.startswith(TEST_USER_PREFIX)))
         await session.commit()
+
+
+@pytest.fixture
+async def demo_limits(monkeypatch):
+    """Turn the public-demo usage limits on, with small numbers and empty counters. Tests
+    tighten single limits through monkeypatch on the returned settings."""
+    settings = get_settings()
+    for name, value in {
+        "limits_enabled": True,
+        "limit_ai_images_per_ip": 4,
+        "limit_ai_images_total": 100,
+        "limit_messages_per_ip": 100,
+        "limit_signups_per_ip": 100,
+        "limit_requests_per_minute": 100,
+    }.items():
+        monkeypatch.setattr(settings, name, value)
+    redis = events.redis_client()
+    async for key in redis.scan_iter("limit:*"):
+        await redis.delete(key)
+    return settings

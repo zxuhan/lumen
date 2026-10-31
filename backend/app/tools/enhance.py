@@ -133,6 +133,7 @@ REPLACE_BACKGROUND = ToolSpec(
     queued=True,
     session_required=True,
     agent_hidden=("negative_prompt",),
+    paid_images=lambda params: params["count"],
 )
 
 EXPAND_CANVAS = ToolSpec(
@@ -146,6 +147,7 @@ EXPAND_CANVAS = ToolSpec(
     handler=expand_canvas_exec,
     queued=True,
     session_required=True,
+    paid_images=1,
 )
 
 UPSCALE_IMAGE = ToolSpec(
@@ -159,4 +161,5 @@ UPSCALE_IMAGE = ToolSpec(
     handler=upscale_image_exec,
     queued=True,
     session_required=True,
+    paid_images=1,
 )

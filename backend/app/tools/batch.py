@@ -6,10 +6,17 @@ from app.services import batch
 from app.tools.base import ToolSpec
 
 BATCH_NAME = "batch_process"
+# Batch operations that call the image provider, once per image
+_PAID_OPERATIONS = {"replace_background", "upscale_image", "expand_canvas"}
 
 
 async def batch_process_exec(session: AsyncSession, run: ToolRun) -> dict:
     return await batch.execute(session, run)
+
+
+def _paid_images(params: dict) -> int:
+    paid = sum(1 for operation in params["operations"] if operation["tool"] in _PAID_OPERATIONS)
+    return paid * len(params["asset_ids"])
 
 
 BATCH_PROCESS = ToolSpec(
@@ -24,4 +31,5 @@ BATCH_PROCESS = ToolSpec(
     handler=batch_process_exec,
     queued=True,
     session_required=False,
+    paid_images=_paid_images,
 )

@@ -13,4 +13,5 @@ GENERATE_IMAGE = ToolSpec(
     params=GenerateIn,
     handler=generation.execute,
     agent_hidden=("seed", "reference_asset_ids"),
+    paid_images=lambda params: params["count"],
 )
