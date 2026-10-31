@@ -19,7 +19,7 @@ async def visitor(client: httpx.AsyncClient, demo_limits) -> httpx.AsyncClient:
 
 
 async def generate(client: httpx.AsyncClient, count: int) -> httpx.Response:
-    return await client.post("/api/runs/generations", json={**PROMPT, "count": count})
+    return await client.post("/api/generations", json={**PROMPT, "count": count})
 
 
 async def test_limits_stay_off_outside_production(client: httpx.AsyncClient):
